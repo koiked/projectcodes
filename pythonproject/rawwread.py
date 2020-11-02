@@ -22,7 +22,7 @@ filelist=sorted(glob.glob("*.raww"))
 covk=np.full((fn,fn),1/(fn*fn))
 covy=np.array([[1/9,1/9,1/9],[0,0,0],[-1/9,-1/9,-1/9]])
 covx=np.array([[1/9,0,-1/9],[1/9,0,-1/9],[1/9,0,-1/9]])
-covs=np.array([[1,2,3],[4,0,5],[6,7,8]])
+covs=np.array([[0,1,2],[3,0,5],[6,7,8]])
 #filelist=filelist[num:num2]
 #print(filelist)
 cv_imgs=[]
@@ -37,8 +37,8 @@ for fnum in filelist:
 #maxval=np.max(maximg)
 #minval=np.min(minimg)
 partimg=maximg-minimg
-maxp=np.max(maximg)
-minp=np.min(minimg)
+maxp=np.max(partimg)
+minp=np.min(partimg)
 #print(minp,maxp)
 #print("out")
 frmnum=0
@@ -59,7 +59,7 @@ for fnum in filelist:
             imgdx[num*2,:,:]=signal.convolve2d(covx,imgh[num,:,:],'valid')
             imgdx[num*2+1,:,:]=signal.convolve2d(covy,imgh[num,:,:],'valid')
             tmp=img_as_float(imgc[num,:,:])
-            coord=peak_local_max(tmp, min_distance=1*fn)
+            coord=peak_local_max(tmp, min_distance=3*fn)
             #print(len(coord))
             for dist in coord:
                 #print(dist)
@@ -69,50 +69,56 @@ for fnum in filelist:
     tmp2=np.zeros((512,512))
     tmp2[1:511,1:511]=iflg[0,:,:]
     tmp3=signal.convolve2d(covs,tmp2,'valid')
+    cnum=np.zeros((4,5))
     for i in range(1,4):
         #print (i,len(list(zip(*np.where(iflg[0,:,:]==1)))))
         for ind in list(zip(*np.where(iflg[i,:,:]==1))):
             a=iflg[0,ind[0],ind[1]]
             b=tmp3[ind[0],ind[1]]
-            if a==0 and b==0 :
+            j=int(b%3)-1
+            k=int(b/3)-1
+            if b>0:
+                iflg[i,ind[0]-k,ind[1]-j]=1
+                imgc[i,ind[0]-k,ind[1]-j]=imgc[i,ind[0],ind[1]]
                 iflg[i,ind[0],ind[1]]=0
-            elif b==1 :
-                iflg[i,ind[0],ind[1]]=0
-                iflg[i,ind[0]+1,ind[1]+1]=1
-                imgc[i,ind[0]+1,ind[1]+1]=imgc[i,ind[0],ind[1]]
-            elif b==2 :
-                iflg[i,ind[0],ind[1]]=0
-                iflg[i,ind[0],ind[1]+1]=1
-                imgc[i,ind[0],ind[1]+1]=imgc[i,ind[0],ind[1]]
-            elif b==3 :
-                iflg[i,ind[0],ind[1]]=0
-                iflg[i,ind[0]-1,ind[1]+1]=1
-                imgc[i,ind[0]-1,ind[1]+1]=imgc[i,ind[0],ind[1]]
-            elif b==4 :
-                iflg[i,ind[0],ind[1]]=0
-                iflg[i,ind[0]+1,ind[1]]=1
-                imgc[i,ind[0]+1,ind[1]]=imgc[i,ind[0],ind[1]]
-            elif b==5 :
-                iflg[i,ind[0],ind[1]]=0
-                iflg[i,ind[0]-1,ind[1]]=1
-                imgc[i,ind[0]-1,ind[1]]=imgc[i,ind[0],ind[1]]
-            elif b==6 :
-                iflg[i,ind[0],ind[1]]=0
-                iflg[i,ind[0]+1,ind[1]-1]=1
-                imgc[i,ind[0]+1,ind[1]-1]=imgc[i,ind[0],ind[1]]
-            elif b==7 :
-                iflg[i,ind[0],ind[1]]=0
-                iflg[i,ind[0],ind[1]-1]=1
-                imgc[i,ind[0],ind[1]-1]=imgc[i,ind[0],ind[1]]
-            elif b==8 :
-                iflg[i,ind[0],ind[1]]=0
-                iflg[i,ind[0]-1,ind[1]-1]=1
-                imgc[i,ind[0]-1,ind[1]-1]=imgc[i,ind[0],ind[1]]
-            
-                #print(i,ind,tmp3[ind[0],ind[1]],iflg[0,ind[0],ind[1]])
+                cnum[i,1]=cnum[i,1]+1
+            elif a==1 :
+                cnum[i,0]=cnum[i,0]+1
+            elif a==0 :
+                tmp4=iflg[0,ind[0]-1*fn:ind[0]+1*fn,ind[1]-1*fn:ind[1]+1*fn]
+                ind2=list(zip(*np.where(tmp4==1)))
+                ind2=np.array(ind2)
+                #print(ind2.shape)
+                ind2=ind2-fn
+                if ind2.shape[0]==0:
+                    cnum[i,4]=cnum[i,4]+1
+                    iflg[i,ind[0],ind[1]]=0
+                    #print(i,cnum[i,4],cnum[i,1],cnum[i,0])
+                    #break
+                    #
+                elif ind2.shape[0]==1 :
+                    dyy=ind2[0,0]
+                    dxx=ind2[0,1]
+                    iflg[i,ind[0]+dyy,ind[1]+dxx]=1
+                    imgc[i,ind[0]+dyy,ind[1]+dxx]=imgc[i,ind[0],ind[1]]
+                    iflg[i,ind[0],ind[1]]=0
+                    mx=np.max(np.abs(ind2))
+                    cnum[i,mx]=cnum[i,mx]+1
+                    #print(dxx,dyy)
+                else :
+                    ind3=ind2[:,0]*ind2[:,0]+ind2[:,1]*ind2[:,1]
+                    im=ind3.argmin()
+                    dyy=ind2[im,0]
+                    dxx=ind2[im,1]
+                    mx=np.max(np.abs(ind2[im,:]))
+                    iflg[i,ind[0]+dyy,ind[1]+dxx]=1
+                    imgc[i,ind[0]+dyy,ind[1]+dxx]=imgc[i,ind[0],ind[1]]
+                    iflg[i,ind[0],ind[1]]=0
+                    cnum[i,mx]=cnum[i,1]+1#print(ind3,ind2[im,:])
+        #print(cnum)
     img8=imgc/maxp*255*iflg
     for ind in list(zip(*np.where(iflg[0,:,:]==1))):
-        if img8[1,ind[0],ind[1]]>0 and img8[2,ind[0],ind[1]]>0 and img8[3,ind[0],ind[1]]>0 :
+        if img8[1,ind[0],ind[1]]+img8[2,ind[0],ind[1]]>8 and img8[3,ind[0],ind[1]]+img8[0,ind[0],ind[1]]>12:
             print(frmnum,ind[0],ind[1],img8[0,ind[0],ind[1]],img8[1,ind[0],ind[1]],img8[2,ind[0],ind[1]],img8[3,ind[0],ind[1]])
     img9a0=(img8[0,:,:]+img8[3,:,:])/2
     img45a=(img8[1,:,:]+img8[2,:,:])/2
